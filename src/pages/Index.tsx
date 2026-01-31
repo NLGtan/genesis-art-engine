@@ -16,7 +16,7 @@ interface NFT {
 }
 
 const Index = () => {
-  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhookUrl, setWebhookUrl] = useState("https://n8n.srv1151765.hstgr.cloud/webhook/generate-nft");
   const [isLoading, setIsLoading] = useState(false);
   const [currentNFT, setCurrentNFT] = useState<NFT | null>(null);
   const [nfts, setNfts] = useState<NFT[]>([]);
@@ -33,6 +33,29 @@ const Index = () => {
     setError("");
     setIsLoading(true);
 
+    // Roll rarity locally (matching n8n workflow logic)
+    const rarities = [
+      { name: "Common", weight: 50 },
+      { name: "Rare", weight: 25 },
+      { name: "Epic", weight: 15 },
+      { name: "Legendary", weight: 8 },
+      { name: "Unique", weight: 2 }
+    ];
+    
+    const roll = Math.random() * 100;
+    let acc = 0;
+    let rarity = "Common";
+    
+    for (const r of rarities) {
+      acc += r.weight;
+      if (roll <= acc) {
+        rarity = r.name;
+        break;
+      }
+    }
+
+    const edition = Date.now().toString();
+
     try {
       const response = await fetch(webhookUrl, {
         method: "POST",
@@ -46,21 +69,9 @@ const Index = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
-      
-      // Handle the response from n8n
-      // Expected format: { images: ["base64..."], rarity: "Common", edition: "..." }
-      const imageBase64 = data.images?.[0] || data.image;
-      const rarity = data.rarity || "Common";
-      const edition = data.edition || Date.now().toString();
-
-      if (!imageBase64) {
-        throw new Error("No image received from webhook");
-      }
-
-      const imageUrl = imageBase64.startsWith("data:") 
-        ? imageBase64 
-        : `data:image/png;base64,${imageBase64}`;
+      // The workflow returns binary PNG data directly
+      const blob = await response.blob();
+      const imageUrl = URL.createObjectURL(blob);
 
       const newNFT: NFT = {
         id: `${edition}-${Date.now()}`,
